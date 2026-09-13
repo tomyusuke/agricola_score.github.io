@@ -472,31 +472,68 @@
     return (v > 0 ? "+" : "") + v;
   }
 
-  // Tap = one step. Press and hold = repeat the step until released,
-  // starting after HOLD_DELAY and repeating every REPEAT_INTERVAL.
+  // Tap (release without moving) = one step. Press and hold in place =
+  // repeat the step every REPEAT_INTERVAL once HOLD_DELAY has passed.
+  // If the finger moves more than MOVE_THRESHOLD px (a scroll/swipe),
+  // the gesture is treated as a scroll and no step is applied.
   function bindHold(el, onStep) {
     var HOLD_DELAY = 400;
     var REPEAT_INTERVAL = 90;
+    var MOVE_THRESHOLD = 10;
     var timer = null;
     var interval = null;
+    var startX = 0, startY = 0;
+    var moved = false;
+    var repeating = false;
 
-    function stop() {
+    function clearTimers() {
       if (timer) { clearTimeout(timer); timer = null; }
       if (interval) { clearInterval(interval); interval = null; }
-      document.removeEventListener("pointerup", stop);
-      document.removeEventListener("pointercancel", stop);
+    }
+
+    function detach() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointercancel", onCancel);
+    }
+
+    function onMove(e) {
+      if (moved) return;
+      var dx = e.clientX - startX;
+      var dy = e.clientY - startY;
+      if ((dx * dx + dy * dy) > (MOVE_THRESHOLD * MOVE_THRESHOLD)) {
+        moved = true;
+        clearTimers();
+      }
+    }
+
+    function onUp() {
+      clearTimers();
+      detach();
+      if (!moved && !repeating) {
+        onStep();
+      }
+    }
+
+    function onCancel() {
+      clearTimers();
+      detach();
     }
 
     el.addEventListener("pointerdown", function (e) {
       if (el.disabled) return;
-      if (e.cancelable) e.preventDefault();
-      stop();
-      onStep();
+      startX = e.clientX;
+      startY = e.clientY;
+      moved = false;
+      repeating = false;
       timer = setTimeout(function () {
+        repeating = true;
+        onStep();
         interval = setInterval(onStep, REPEAT_INTERVAL);
       }, HOLD_DELAY);
-      document.addEventListener("pointerup", stop);
-      document.addEventListener("pointercancel", stop);
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointercancel", onCancel);
     });
     el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
   }
