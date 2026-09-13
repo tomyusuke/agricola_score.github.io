@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>アグリコラ得点計算</title>
+<style>
+  :root {
+    --bg: #f4ede1;
+    --card-bg: #ffffff;
+    --accent: #7a5230;
+    --accent-dark: #4e3420;
+    --accent-light: #c9a86a;
+    --line: #e0d4bd;
+    --text: #3a2c1e;
+    --sub2: #8a7a63;
+    --plus: #4c7a4c;
+    --minus: #a5453d;
+    --danger: #a5453d;
+    --total-bg: #4e3420;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Sans", "Yu Gothic", "Meiryo", system-ui, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  body { padding: 12px 10px 80px; }
+
+  h1 {
+    font-size: 1.25rem;
+    text-align: center;
+    margin: 6px 0 4px;
+    color: var(--accent-dark);
+    letter-spacing: 0.02em;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--sub2);
+    margin-bottom: 14px;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    outline: none;
+  }
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .btn:active { background: var(--accent-dark); }
+  .btn.secondary {
+    background: #fff;
+    color: var(--accent-dark);
+    border: 1px solid var(--accent-light);
+  }
+  .btn.secondary:active { background: var(--line); }
+
+  #ranking {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    display: none;
+  }
+  #ranking.show { display: block; }
+  #ranking h2 {
+    font-size: 0.85rem;
+    margin: 0 0 8px;
+    color: var(--accent-dark);
+  }
+  .rank-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 0;
+    font-size: 0.9rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .rank-row:last-child { border-bottom: none; }
+  .rank-row .rank-name { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .rank-medal { font-size: 1rem; }
+  .rank-row .rank-score { font-weight: 700; color: var(--accent-dark); }
+
+  .score-table-panel {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    display: none;
+  }
+  .score-table-panel.show { display: block; }
+  .score-table-panel h2 {
+    font-size: 0.85rem;
+    margin: 0 0 8px;
+    color: var(--accent-dark);
+  }
+  .score-table-hint {
+    font-size: 0.72rem;
+    color: var(--sub2);
+    margin-bottom: 8px;
+  }
+  .score-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #scoreTable {
+    border-collapse: collapse;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+  #scoreTable th, #scoreTable td {
+    padding: 5px 7px;
+    text-align: center;
+    border: 1px solid var(--line);
+  }
+  #scoreTable th {
+    background: #fbf6ec;
+    color: var(--accent-dark);
+    font-weight: 700;
+  }
+  #scoreTable th.pos { color: var(--plus); }
+  #scoreTable th.neg { color: var(--minus); }
+  #scoreTable td.cat-name {
+    text-align: left;
+    font-weight: 700;
+    background: #fbf6ec;
+    position: sticky;
+    left: 0;
+  }
+  #scoreTable td.pos { color: var(--plus); font-weight: 700; }
+  #scoreTable td.neg { color: var(--minus); font-weight: 700; }
+  .linear-score-list {
+    margin-top: 10px;
+    font-size: 0.78rem;
+    color: var(--text);
+    line-height: 1.8;
+  }
+  .linear-score-list div {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    border-bottom: 1px dashed var(--line);
+  }
+  .linear-score-list div:last-child { border-bottom: none; }
+  .linear-score-list .val { font-weight: 700; color: var(--accent-dark); }
+
+  .player {
+    background: var(--card-bg);
+    border-radius: 14px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .player-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: linear-gradient(180deg, #fbf6ec, #f2e8d6);
+    border-bottom: 1px solid var(--line);
+  }
+  .player-header input.name {
+    flex: 1;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-dark);
+    border: none;
+    background: transparent;
+    padding: 4px 2px;
+    min-width: 0;
+  }
+  .player-total {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #fff;
+    background: var(--total-bg);
+    padding: 4px 10px;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+  .icon-btn {
+    background: transparent;
+    color: var(--sub2);
+    font-size: 1.1rem;
+    padding: 4px 6px;
+    border-radius: 6px;
+  }
+  .icon-btn:active { background: var(--line); }
+
+  .player-body {
+    padding: 8px 10px 12px;
+  }
+  .section-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--sub2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 10px 4px 4px;
+  }
+  .section-title:first-child { margin-top: 2px; }
+
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 4px;
+    gap: 8px;
+  }
+  .row .label {
+    font-size: 0.88rem;
+    flex: 1;
+    min-width: 0;
+  }
+  .row .label small {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--sub2);
+    font-weight: 400;
+  }
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .stepper button {
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+    font-size: 1.2rem;
+    font-weight: 700;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    color: var(--accent-dark);
+    line-height: 1;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .stepper button:active { background: var(--line); }
+  .stepper button.minus { color: var(--minus); }
+  .stepper button.plus { color: var(--plus); }
+  .stepper button:disabled { color: var(--line) !important; opacity: 0.5; }
+  .stepper input {
+    width: 30px;
+    text-align: center;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card-bg);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    padding: 6px 2px;
+    -moz-appearance: textfield;
+  }
+  .stepper input::-webkit-outer-spin-button,
+  .stepper input::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
+  .pts {
+    min-width: 34px;
+    text-align: right;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--sub2);
+  }
+  .pts.pos { color: var(--plus); }
+  .pts.neg { color: var(--minus); }
+  .pts.zero { color: var(--sub2); }
+
+  .breakdown-toggle {
+    text-align: center;
+    padding: 8px 0 2px;
+  }
+  .breakdown-toggle span {
+    font-size: 0.78rem;
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  .footnote {
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--sub2);
+    margin-top: 20px;
+    line-height: 1.6;
+    padding: 0 12px;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: var(--sub2);
+    font-size: 0.9rem;
+    padding: 40px 20px;
+  }
+
+  .bottom-toolbar {
+    display: flex;
+    justify-content: center;
+    margin: 8px 0 4px;
+  }
+  .bottom-toolbar .btn {
+    width: 100%;
+    max-width: 360px;
+    padding: 13px 16px;
+    font-size: 0.95rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>🌾 アグリコラ得点計算</h1>
+<div class="subtitle">農場拡張を追加して各プレイヤーの得点を計算</div>
+
+<div class="toolbar">
+  <button class="btn secondary" id="scoreTableBtn">📋 得点表</button>
+  <button class="btn secondary" id="resetBtn">リセット</button>
+</div>
+
+<div id="scoreTablePanel" class="score-table-panel">
+  <h2>得点対応表</h2>
+  <div class="score-table-hint">セルの数字は、その得点を得るために必要な所持数です</div>
+  <div class="score-table-scroll">
+    <table id="scoreTable"></table>
+  </div>
+  <div id="linearScoreList" class="linear-score-list"></div>
+</div>
+
+<div id="ranking">
+  <h2>順位</h2>
+  <div id="rankingList"></div>
+</div>
+
+<div id="players"></div>
+<div id="emptyState" class="empty-state">「＋ プレイヤーを追加」で得点計算を始めましょう</div>
+
+<div class="bottom-toolbar">
+  <button class="btn" id="addPlayerBtn">＋ プレイヤーを追加</button>
+</div>
+
+<div class="footnote">
+  入力内容はこの端末に自動保存されます。<br>
+  農場・柵の得点表は標準版アグリコラの得点表に基づきます。
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "agricola_score_calc_v1";
+
+  // ---- Scoring tables (standard Agricola scoring) ----
+  function tableScore(table, n) {
+    n = Math.max(0, n);
+    var idx = Math.min(n, table.length - 1);
+    return table[idx];
+  }
+  var TABLES = {
+    fields:   [-1, -1, 1, 2, 3, 4],           // 0,1,2,3,4,5+
+    pastures: [-1, 1, 2, 3, 4],               // 0,1,2,3,4+
+    grain:    [-1, 1, 1, 1, 2, 2, 3, 3, 4],   // 0..7,8+
+    veg:      [-1, 1, 2, 3, 4],               // 0,1,2,3,4+
+    sheep:    [-1, 1, 1, 1, 2, 2, 3, 3, 4],   // 0..7,8+
+    boar:     [-1, 1, 1, 2, 2, 3, 3, 4],      // 0..6,7+
+    cattle:   [-1, 1, 2, 2, 3, 3, 4]          // 0,1,2,3,4,5,6+
+  };
+
+  var FIELD_DEFS = [
+    { key: "fields",   label: "🟫 畑",       sub: "小麦・野菜を植える畑の数", table: TABLES.fields },
+    { key: "pastures", label: "🟩 牧場",     sub: "柵で囲われた牧場の数",     table: TABLES.pastures },
+    { key: "grain",    label: "🌾 穀物",     sub: "小麦の所持数",             table: TABLES.grain },
+    { key: "veg",      label: "🥕 野菜",     sub: "野菜の所持数",             table: TABLES.veg },
+    { key: "sheep",    label: "🐑 羊",       sub: "羊の所持数",               table: TABLES.sheep },
+    { key: "boar",     label: "🐗 猪",       sub: "猪の所持数",               table: TABLES.boar },
+    { key: "cattle",   label: "🐄 牛",       sub: "牛の所持数",               table: TABLES.cattle }
+  ];
+
+  var OTHER_DEFS = [
+    { key: "stables",  label: "🛖 柵内の厩",   sub: "牧場内にある厩の数（1つにつき+1点、最大4）", perUnit: 1, max: 4 },
+    { key: "empty",     label: "🕳️ 未使用スペース", sub: "何も置かれていない農場スペース（1つにつき-1点）", perUnit: -1 },
+    { key: "roomWood",  label: "🪵 木の部屋",   sub: "1部屋につき0点", perUnit: 0 },
+    { key: "roomClay",  label: "🧱 レンガの部屋", sub: "1部屋につき+1点", perUnit: 1 },
+    { key: "roomStone", label: "🪨 石の部屋",   sub: "1部屋につき+2点", perUnit: 2 },
+    { key: "family",    label: "👪 家族の人数", sub: "成人+子供の合計（1人につき+3点、最大5）", perUnit: 3, max: 5 }
+  ];
+
+  var CARD_DEF  = { key: "cardPoints", label: "🃏 カード得点", sub: "小さな進歩に記載の得点を合算して入力" };
+  var BONUS_DEF = { key: "bonus",      label: "✨ ボーナス得点", sub: "物乞いカード（-3点/枚）などその他の加減点を合算して入力" };
+
+  var players = [];
+  var nextId = 1;
+
+  function defaultPlayer(name) {
+    var p = { id: nextId++, name: name || ("プレイヤー" + nextId), values: {}, cardPoints: 0, bonus: 0, showBreakdown: false };
+    FIELD_DEFS.forEach(function (d) { p.values[d.key] = 0; });
+    OTHER_DEFS.forEach(function (d) { p.values[d.key] = 0; });
+    return p;
+  }
+
+  function calcTotal(p) {
+    var total = 0;
+    FIELD_DEFS.forEach(function (d) {
+      total += tableScore(d.table, p.values[d.key]);
+    });
+    OTHER_DEFS.forEach(function (d) {
+      total += p.values[d.key] * d.perUnit;
+    });
+    total += (p.cardPoints || 0);
+    total += (p.bonus || 0);
+    return total;
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ players: players, nextId: nextId }));
+    } catch (e) { /* storage unavailable, ignore */ }
+  }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      var data = JSON.parse(raw);
+      if (data && Array.isArray(data.players)) {
+        players = data.players.map(function (p) {
+          var np = defaultPlayer(p.name);
+          np.id = p.id;
+          np.cardPoints = p.cardPoints || 0;
+          np.bonus = p.bonus || 0;
+          np.showBreakdown = !!p.showBreakdown;
+          Object.keys(np.values).forEach(function (k) {
+            if (typeof p.values === "object" && p.values && (k in p.values)) {
+              np.values[k] = Number(p.values[k]) || 0;
+            }
+          });
+          return np;
+        });
+        nextId = data.nextId || (players.length + 1);
+        return true;
+      }
+    } catch (e) { /* ignore corrupt data */ }
+    return false;
+  }
+
+  function ptsClass(v) {
+    if (v > 0) return "pts pos";
+    if (v < 0) return "pts neg";
+    return "pts zero";
+  }
+  function fmtPts(v) {
+    return (v > 0 ? "+" : "") + v;
+  }
+
+  // Tap = one step. Press and hold = repeat the step until released,
+  // starting after HOLD_DELAY and repeating every REPEAT_INTERVAL.
+  function bindHold(el, onStep) {
+    var HOLD_DELAY = 400;
+    var REPEAT_INTERVAL = 90;
+    var timer = null;
+    var interval = null;
+
+    function stop() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      if (interval) { clearInterval(interval); interval = null; }
+      document.removeEventListener("pointerup", stop);
+      document.removeEventListener("pointercancel", stop);
+    }
+
+    el.addEventListener("pointerdown", function (e) {
+      if (el.disabled) return;
+      if (e.cancelable) e.preventDefault();
+      stop();
+      onStep();
+      timer = setTimeout(function () {
+        interval = setInterval(onStep, REPEAT_INTERVAL);
+      }, HOLD_DELAY);
+      document.addEventListener("pointerup", stop);
+      document.addEventListener("pointercancel", stop);
+    });
+    el.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+  }
+
+  var playersEl = document.getElementById("players");
+  var emptyStateEl = document.getElementById("emptyState");
+  var rankingEl = document.getElementById("ranking");
+  var rankingListEl = document.getElementById("rankingList");
+
+  function render() {
+    playersEl.innerHTML = "";
+    emptyStateEl.style.display = players.length === 0 ? "block" : "none";
+
+    players.forEach(function (p) {
+      playersEl.appendChild(renderPlayer(p));
+    });
+
+    renderRanking();
+    save();
+  }
+
+  function renderRanking() {
+    if (players.length < 2) {
+      rankingEl.classList.remove("show");
+      return;
+    }
+    rankingEl.classList.add("show");
+    var ranked = players.slice().sort(function (a, b) {
+      return calcTotal(b) - calcTotal(a);
+    });
+    rankingListEl.innerHTML = "";
+    var medals = ["🥇", "🥈", "🥉"];
+    ranked.forEach(function (p, i) {
+      var row = document.createElement("div");
+      row.className = "rank-row";
+      var medal = medals[i] || (i + 1) + "位";
+      row.innerHTML =
+        '<span class="rank-name"><span class="rank-medal">' + medal + '</span>' +
+        escapeHtml(p.name) + '</span>' +
+        '<span class="rank-score">' + calcTotal(p) + ' 点</span>';
+      rankingListEl.appendChild(row);
+    });
+  }
+
+  function escapeHtml(s) {
+    var div = document.createElement("div");
+    div.textContent = s == null ? "" : s;
+    return div.innerHTML;
+  }
+
+  function renderPlayer(p) {
+    var card = document.createElement("div");
+    card.className = "player";
+
+    // header
+    var header = document.createElement("div");
+    header.className = "player-header";
+
+    var nameInput = document.createElement("input");
+    nameInput.className = "name";
+    nameInput.value = p.name;
+    nameInput.maxLength = 20;
+    nameInput.addEventListener("input", function () {
+      p.name = nameInput.value;
+      save();
+      renderRanking();
+    });
+
+    var totalEl = document.createElement("div");
+    totalEl.className = "player-total";
+    totalEl.textContent = calcTotal(p) + " 点";
+
+    var delBtn = document.createElement("button");
+    delBtn.className = "icon-btn";
+    delBtn.textContent = "🗑";
+    delBtn.addEventListener("click", function () {
+      if (confirm(p.name + " を削除しますか？")) {
+        players = players.filter(function (x) { return x.id !== p.id; });
+        render();
+      }
+    });
+
+    header.appendChild(nameInput);
+    header.appendChild(totalEl);
+    header.appendChild(delBtn);
+    card.appendChild(header);
+
+    // body
+    var body = document.createElement("div");
+    body.className = "player-body";
+
+    var farmTitle = document.createElement("div");
+    farmTitle.className = "section-title";
+    farmTitle.textContent = "農場・資源";
+    body.appendChild(farmTitle);
+
+    FIELD_DEFS.forEach(function (d) {
+      body.appendChild(renderCountRow(p, d, function (val) {
+        return tableScore(d.table, val);
+      }, totalEl));
+    });
+
+    var otherTitle = document.createElement("div");
+    otherTitle.className = "section-title";
+    otherTitle.textContent = "住居・家族・その他";
+    body.appendChild(otherTitle);
+
+    OTHER_DEFS.forEach(function (d) {
+      body.appendChild(renderCountRow(p, d, function (val) {
+        return val * d.perUnit;
+      }, totalEl));
+    });
+
+    var bonusTitle = document.createElement("div");
+    bonusTitle.className = "section-title";
+    bonusTitle.textContent = "カード得点・ボーナス";
+    body.appendChild(bonusTitle);
+
+    body.appendChild(renderManualRow(p, "cardPoints", CARD_DEF, totalEl));
+    body.appendChild(renderManualRow(p, "bonus", BONUS_DEF, totalEl));
+
+    card.appendChild(body);
+    return card;
+  }
+
+  function renderCountRow(p, def, scoreFn, totalEl) {
+    var row = document.createElement("div");
+    row.className = "row";
+
+    var label = document.createElement("div");
+    label.className = "label";
+    label.innerHTML = escapeHtml(def.label) + (def.sub ? "<small>" + escapeHtml(def.sub) + "</small>" : "");
+
+    var stepper = document.createElement("div");
+    stepper.className = "stepper";
+
+    var minus = document.createElement("button");
+    minus.className = "minus";
+    minus.textContent = "−";
+
+    var maxVal = typeof def.max === "number" ? def.max : 99;
+
+    var input = document.createElement("input");
+    input.type = "number";
+    input.inputMode = "numeric";
+    input.min = "0";
+    input.max = String(maxVal);
+    input.value = p.values[def.key];
+
+    var plus = document.createElement("button");
+    plus.className = "plus";
+    plus.textContent = "＋";
+
+    var ptsEl = document.createElement("div");
+    ptsEl.className = "pts";
+
+    function refresh() {
+      var v = p.values[def.key];
+      var s = scoreFn(v);
+      ptsEl.className = ptsClass(s);
+      ptsEl.textContent = fmtPts(s);
+      totalEl.textContent = calcTotal(p) + " 点";
+      plus.disabled = v >= maxVal;
+    }
+
+    function setVal(v) {
+      v = Math.max(0, Math.min(maxVal, Math.round(v) || 0));
+      p.values[def.key] = v;
+      input.value = v;
+      refresh();
+      save();
+      renderRanking();
+    }
+
+    bindHold(minus, function () { setVal(p.values[def.key] - 1); });
+    bindHold(plus, function () { setVal(p.values[def.key] + 1); });
+    input.addEventListener("input", function () { setVal(parseInt(input.value, 10)); });
+    input.addEventListener("blur", function () { setVal(parseInt(input.value, 10)); });
+
+    stepper.appendChild(minus);
+    stepper.appendChild(input);
+    stepper.appendChild(plus);
+
+    row.appendChild(label);
+    row.appendChild(stepper);
+    row.appendChild(ptsEl);
+
+    refresh();
+    return row;
+  }
+
+  function renderManualRow(p, propKey, def, totalEl) {
+    var row = document.createElement("div");
+    row.className = "row";
+
+    var label = document.createElement("div");
+    label.className = "label";
+    label.innerHTML = escapeHtml(def.label) + "<small>" + escapeHtml(def.sub) + "</small>";
+
+    var stepper = document.createElement("div");
+    stepper.className = "stepper";
+
+    var minus = document.createElement("button");
+    minus.className = "minus";
+    minus.textContent = "−";
+
+    var input = document.createElement("input");
+    input.type = "number";
+    input.inputMode = "numeric";
+    input.value = p[propKey];
+    input.style.width = "46px";
+
+    var plus = document.createElement("button");
+    plus.className = "plus";
+    plus.textContent = "＋";
+
+    function setVal(v) {
+      v = Math.max(-99, Math.min(99, Math.round(v) || 0));
+      p[propKey] = v;
+      input.value = v;
+      totalEl.textContent = calcTotal(p) + " 点";
+      save();
+      renderRanking();
+    }
+
+    bindHold(minus, function () { setVal(p[propKey] - 1); });
+    bindHold(plus, function () { setVal(p[propKey] + 1); });
+    input.addEventListener("input", function () { setVal(parseInt(input.value, 10)); });
+    input.addEventListener("blur", function () { setVal(parseInt(input.value, 10)); });
+
+    stepper.appendChild(minus);
+    stepper.appendChild(input);
+    stepper.appendChild(plus);
+
+    row.appendChild(label);
+    row.appendChild(stepper);
+
+    return row;
+  }
+
+  var POINT_LEVELS = [-1, 1, 2, 3, 4];
+
+  // Inverts a count->points table into points->required-count-range,
+  // e.g. fields [-1,-1,1,2,3,4] => { "-1": "0-1", "1": "2", ..., "4": "5+" }
+  function invertTable(table) {
+    var groups = [];
+    for (var i = 0; i < table.length; i++) {
+      var v = table[i];
+      if (groups.length && groups[groups.length - 1].value === v) {
+        groups[groups.length - 1].end = i;
+      } else {
+        groups.push({ value: v, start: i, end: i });
+      }
+    }
+    var map = {};
+    groups.forEach(function (g, gi) {
+      var isLast = gi === groups.length - 1;
+      var label;
+      if (isLast) {
+        label = g.start + "+";
+      } else if (g.start === g.end) {
+        label = String(g.start);
+      } else {
+        label = g.start + "-" + g.end;
+      }
+      map[g.value] = label;
+    });
+    return map;
+  }
+
+  function buildScoreTable() {
+    var table = document.getElementById("scoreTable");
+    table.innerHTML = "";
+
+    var thead = document.createElement("tr");
+    var thCat = document.createElement("th");
+    thCat.textContent = "得点";
+    thead.appendChild(thCat);
+    POINT_LEVELS.forEach(function (pv) {
+      var th = document.createElement("th");
+      th.className = pv < 0 ? "neg" : "pos";
+      th.textContent = fmtPts(pv) + "点";
+      thead.appendChild(th);
+    });
+    table.appendChild(thead);
+
+    FIELD_DEFS.forEach(function (d) {
+      var tr = document.createElement("tr");
+      var nameTd = document.createElement("td");
+      nameTd.className = "cat-name";
+      nameTd.textContent = d.label;
+      tr.appendChild(nameTd);
+      var reqMap = invertTable(d.table);
+      POINT_LEVELS.forEach(function (pv) {
+        var td = document.createElement("td");
+        td.textContent = reqMap[pv] !== undefined ? reqMap[pv] : "—";
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    });
+
+    var linearList = document.getElementById("linearScoreList");
+    linearList.innerHTML = "";
+    OTHER_DEFS.forEach(function (d) {
+      var row = document.createElement("div");
+      var per = d.perUnit;
+      var text = per === 0 ? "0点" : (per > 0 ? "+" + per + "点" : per + "点") + " / 1つ";
+      row.innerHTML = "<span>" + escapeHtml(d.label) + "</span><span class=\"val\">" + text + "</span>";
+      linearList.appendChild(row);
+    });
+    [CARD_DEF, BONUS_DEF].forEach(function (d) {
+      var row = document.createElement("div");
+      row.innerHTML = "<span>" + escapeHtml(d.label) + "</span><span class=\"val\">手入力で合算</span>";
+      linearList.appendChild(row);
+    });
+  }
+
+  document.getElementById("scoreTableBtn").addEventListener("click", function () {
+    document.getElementById("scoreTablePanel").classList.toggle("show");
+  });
+  buildScoreTable();
+
+  document.getElementById("addPlayerBtn").addEventListener("click", function () {
+    var p = defaultPlayer("プレイヤー" + (players.length + 1));
+    players.push(p);
+    render();
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", function () {
+    if (confirm("全てのプレイヤーの入力をリセットしますか？")) {
+      players = [defaultPlayer("プレイヤー1")];
+      render();
+    }
+  });
+
+  // init
+  load();
+  if (players.length === 0) {
+    players = [defaultPlayer("プレイヤー1")];
+  }
+  render();
+})();
+</script>
+
+</body>
+</html>
